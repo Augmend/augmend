@@ -61,7 +61,7 @@ class GHAapp < Sinatra::Application
     # # # # # # # # # # # #
     # ADD YOUR CODE HERE  #
     # # # # # # # # # # # #
-
+    print @payload
     200 # success status
   end
 
