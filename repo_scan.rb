@@ -75,8 +75,8 @@ class CodeScan
             @repository,
             @base_branch,
             @new_branch,
-            "Augmend bot replaced racially insensitive words in the repo",
-            "Augmend bot replaced racially insensitive words in the repo")
+            "[Augmend Bot] Suggested File Replacements",
+            "Augmend bot replaced racially insensitive words in the repository")
     end
 
     # Scan a file to replace inappropriate words
