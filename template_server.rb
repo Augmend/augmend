@@ -8,6 +8,8 @@ require 'time'        # Gets ISO 8601 representation of a Time object
 require 'logger'      # Logs debug statements
 require 'open-uri'
 
+require_relative "repo_scan"
+
 set :port, 3000
 set :bind, '0.0.0.0'
 
@@ -44,7 +46,7 @@ class GHAapp < Sinatra::Application
   REPLACEMENT_WORDS = {
     'whitelist' => 'enablelist',
     'blacklist' => 'blocklist',
-    'master' => 'main',
+    'master' => 'primary',
     'slave' =>'secondary'
   }
 
@@ -67,9 +69,16 @@ class GHAapp < Sinatra::Application
   post '/event_handler' do
     # listen for open pull requests
     case request.env['HTTP_X_GITHUB_EVENT']
-    when 'pull_request'
-      if !(["locked", "closed"].include? @payload['action'])
-        handle_new_pull_request(@payload)
+    # when 'pull_request'
+    #   if !(["locked", "closed"].include? @payload['action'])
+    #     handle_new_pull_request(@payload)
+    #   end
+    when 'installation'
+      if @payload['action'] === 'created'
+        @payload['repositories'].each do |repository|
+          scanObj = CodeScan.new(@installation_client, repository['full_name'])
+          scanObj.start
+        end
       end
     end
 
