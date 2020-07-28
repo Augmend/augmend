@@ -105,7 +105,7 @@ class GHAapp < Sinatra::Application
           line_number = 0
           f.each_line do |line|
             line_number += 1
-BLOCK_WORDS.each do |word|
+            BLOCK_WORDS.each do |word|
               if line.downcase.include?(word)
                 # contents[line_number + 1] = line
                 body = "revisit this line to fix culturally insensitive language #{line_number}"
