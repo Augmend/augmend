@@ -88,41 +88,44 @@ class GHAapp < Sinatra::Application
       return line.downcase.include?(word)
     end
 
-    def match_casing(original_word):
+    def match_casing(original_word)
       # all lowercase, no special chars
-      if !original_word.include?("-") && !original_word.include?("_")
+      if !original_word.include?("-") && !original_word.include?("_") && is_downcase?(original_word)
         replacement = REPLACEMENT_WORDS[original_word]
         replacement = replacement.gsub(/_/, "")
-        if is_downcase?(original_word):
-          return replacement.downcase
-        else
-          return replacement.upcase
-        end
+        return replacement.downcase
+      # all uppercase, no special chars
+      elsif !original_word.include?("-") && !original_word.include?("_") && is_uppercase?(original_word)
+        replacement = REPLACEMENT_WORDS[original_word]
+        replacement = replacement.gsub(/_/, "")
+        return replacement.upcase
       # snake case
       elsif is_snakecase?(original_word)
         normalized = original_word.gsub(/_/, "")
         if is_downcase?(normalized)
-          return REPLACEMENT_WORDS[original_word].downcase
-        else
-          return REPLACEMENT_WORDS[original_word].upcase
+          return REPLACEMENT_WORDS[normalized].downcase
+        elsif is_uppercase?(normalized)
+          return REPLACEMENT_WORDS[normalized].upcase
         end
       # hyphenated words
       elsif is_hyphenated?(original_word)
         normalized = original_word.gsub(/-/, "")
         if is_downcase?(normalized)
-          replacement = REPLACEMENT_WORDS[original_word].downcase
-        else
-          replacement = REPLACEMENT_WORDS[original_word].upcase
+          replacement = REPLACEMENT_WORDS[normalized].downcase
+        elsif is_uppercase?(normalized)
+          replacement = REPLACEMENT_WORDS[normalized].upcase
         end
         return replacement.dasherize()
       # camel case
       else
-        if is_downcase(original_word[0])
-          replacement = REPLACEMENT_WORDS[original_word]
-          return replacement.camelize(:lower)
+        normalized = original_word.downcase
+        replacement = REPLACEMENT_WORDS[normalized]
+        if is_downcase?(original_word[0])
+          replacement = replacement.split('_').collect(&:capitalize).join
+          replacement[0] = replacement[0].downcase
+          return replacement
         else
-          replacement = REPLACEMENT_WORDS[original_word]
-          return replacement.camelize(:upper)
+          return replacement.split('_').collect(&:capitalize).join
         end
       end
     end
@@ -142,6 +145,22 @@ class GHAapp < Sinatra::Application
     def is_uppercase?(word)
       word == word.upcase
     end
+
+    def get_all_block_words(line)
+      unnormalized_tokens = line.split(" ")
+
+      line = line.gsub(/_|-/, "").downcase
+      tokenized = line.split(" ")
+
+      words = []
+      tokenized.each_with_index do |token, index|
+        if REPLACEMENT_WORDS.keys.include?(token)
+          words.push(unnormalized_tokens[index])
+        end
+      end
+
+      return words
+    end 
 
     # # # # # # # # # # # # # # # # #
     # ADD YOUR HELPER METHODS HERE  #
@@ -168,9 +187,12 @@ class GHAapp < Sinatra::Application
               if contains_block_word(line, word)
                 body = "revisit this line to fix culturally insensitive language #{line_number}"
 
-                replacement = match_casing(word)
-                fixed_line = line.gsub(word, replacement)
-                puts fixed_line
+                fixed_line = line
+                block_words = get_all_block_words(line)
+                block_words.each do |block_word|
+                  replacement = match_casing(block_word)
+                  fixed_line = fixed_line.gsub(block_word, replacement)
+                end
 
                 comments_array += [{
                   :path => file_name,
