@@ -41,10 +41,12 @@ class GHAapp < Sinatra::Application
   # The GitHub App's identifier (type integer) set when registering an app.
   APP_IDENTIFIER = ENV['GITHUB_APP_IDENTIFIER']
 
-
-  PERSONAL_ACCESS_TOKEN = ENV['GITHUB_PERSONAL_ACCESS_TOKEN']
-
-  BLOCK_WORDS = ['whitelist', 'blacklist', 'master', 'slave']
+  REPLACEMENT_WORDS = {
+    'whitelist' => 'enablelist',
+    'blacklist' => 'blocklist',
+    'master' => 'main',
+    'slave' =>'secondary'
+  }
 
   # Turn on Sinatra's verbose logging during development
   configure :development do
@@ -97,7 +99,7 @@ class GHAapp < Sinatra::Application
       changed_files.each do |item|
         file_raw_url = item.raw_url
         file_name = item.filename # path
-        commit_id = item.sha
+        comments_array = []
 
         # puts item.to_yaml_properties()
 
@@ -105,14 +107,10 @@ class GHAapp < Sinatra::Application
           line_number = 0
           f.each_line do |line|
             line_number += 1
-            BLOCK_WORDS.each do |word|
+            REPLACEMENT_WORDS.keys.each do |word|
               if line.downcase.include?(word)
                 # contents[line_number + 1] = line
                 body = "revisit this line to fix culturally insensitive language #{line_number}"
-
-                # TODO make this comment a code suggestion instead
-                # use the options parameter
-                puts repo, pr_number, body, commit_id, file_name, line_number
 
                 # @installation_client.add_comment("Augmend/test-repo", 3, "testing this")
 
@@ -125,23 +123,26 @@ class GHAapp < Sinatra::Application
                 #   line_number,
                 # )
 
-                options = {
-                  :body => "overall body",
-                  :commit_id => sha,
-                  :event => "REQUEST_CHANGES",
-                  :comments => [
-                    {
-                      :path => file_name,
-                      :position => line_number,
-                      :body => "test this text\n```suggestion\nanother enablelist test\n```",
-                    }
-                  ]
-                }
+                fixed_line = line.gsub(word, REPLACEMENT_WORDS[word])
+                puts fixed_line
 
-                @installation_client.post("/repos/#{repo}/pulls/#{pr_number}/reviews", options)
+                comments_array += [{
+                  :path => file_name,
+                  :line => line_number,
+                  :body => "test this text\n```suggestion\n#{fixed_line}```",
+                }]
               end
             end
           end
+
+          options = {
+            :body => "overall body",
+            :commit_id => sha,
+            :event => "REQUEST_CHANGES",
+            :comments => comments_array
+          }
+
+          @installation_client.post("/repos/#{repo}/pulls/#{pr_number}/reviews", options)
         }
       end
     end
