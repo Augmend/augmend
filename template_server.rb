@@ -42,8 +42,8 @@ class GHAapp < Sinatra::Application
   APP_IDENTIFIER = ENV['GITHUB_APP_IDENTIFIER']
 
   REPLACEMENT_WORDS = {
-    'whitelist' => 'enablelist',
-    'blacklist' => 'blocklist',
+    'whitelist' => 'enable_list',
+    'blacklist' => 'block_list',
     'master' => 'main',
     'slave' =>'secondary'
   }
@@ -83,6 +83,65 @@ class GHAapp < Sinatra::Application
 
 
   helpers do
+    def contains_block_word(line, word)
+      line = line.gsub(/_|-/, "")
+      return line.downcase.include?(word)
+    end
+
+    def match_casing(original_word):
+      # all lowercase, no special chars
+      if !original_word.include?("-") && !original_word.include?("_")
+        replacement = REPLACEMENT_WORDS[original_word]
+        replacement = replacement.gsub(/_/, "")
+        if is_downcase?(original_word):
+          return replacement.downcase
+        else
+          return replacement.upcase
+        end
+      # snake case
+      elsif is_snakecase?(original_word)
+        normalized = original_word.gsub(/_/, "")
+        if is_downcase?(normalized)
+          return REPLACEMENT_WORDS[original_word].downcase
+        else
+          return REPLACEMENT_WORDS[original_word].upcase
+        end
+      # hyphenated words
+      elsif is_hyphenated?(original_word)
+        normalized = original_word.gsub(/-/, "")
+        if is_downcase?(normalized)
+          replacement = REPLACEMENT_WORDS[original_word].downcase
+        else
+          replacement = REPLACEMENT_WORDS[original_word].upcase
+        end
+        return replacement.dasherize()
+      # camel case
+      else
+        if is_downcase(original_word[0])
+          replacement = REPLACEMENT_WORDS[original_word]
+          return replacement.camelize(:lower)
+        else
+          replacement = REPLACEMENT_WORDS[original_word]
+          return replacement.camelize(:upper)
+        end
+      end
+    end
+
+    def is_hyphenated?(word)
+      word.include?("-")
+    end
+
+    def is_snakecase?(word)
+      word.include?("_")
+    end
+
+    def is_downcase?(word)
+      word == word.downcase
+    end
+
+    def is_uppercase?(word)
+      word == word.upcase
+    end
 
     # # # # # # # # # # # # # # # # #
     # ADD YOUR HELPER METHODS HERE  #
@@ -101,29 +160,16 @@ class GHAapp < Sinatra::Application
         file_name = item.filename # path
         comments_array = []
 
-        # puts item.to_yaml_properties()
-
         URI.open(file_raw_url) {|f|
           line_number = 0
           f.each_line do |line|
             line_number += 1
             REPLACEMENT_WORDS.keys.each do |word|
-              if line.downcase.include?(word)
-                # contents[line_number + 1] = line
+              if contains_block_word(line, word)
                 body = "revisit this line to fix culturally insensitive language #{line_number}"
 
-                # @installation_client.add_comment("Augmend/test-repo", 3, "testing this")
-
-                # @installation_client.create_pull_request_comment(
-                #   repo,
-                #   pr_number,
-                #   body,
-                #   sha,
-                #   file_name,
-                #   line_number,
-                # )
-
-                fixed_line = line.gsub(word, REPLACEMENT_WORDS[word])
+                replacement = match_casing(word)
+                fixed_line = line.gsub(word, replacement)
                 puts fixed_line
 
                 comments_array += [{
