@@ -130,6 +130,18 @@ class GHAapp < Sinatra::Application
       end
     end
 
+    def replace_block_words(block_words, line)
+      puts block_words, line
+
+      fixed_line = line
+      block_words.each do |word|
+        replacement = match_casing(word)
+        fixed_line = fixed_line.gsub(line, replacements)
+      end
+      return fixed_line
+    end
+
+
     def is_hyphenated?(word)
       word.include?("-")
     end
@@ -146,20 +158,12 @@ class GHAapp < Sinatra::Application
       word == word.upcase
     end
 
-    def get_all_block_words(line)
-      unnormalized_tokens = line.split(" ")
-
+  
+    def get_all_occurences_of_block_word(line, block_word)
       line = line.gsub(/_|-/, "").downcase
-      tokenized = line.split(" ")
-
-      words = []
-      tokenized.each_with_index do |token, index|
-        if REPLACEMENT_WORDS.keys.include?(token)
-          words.push(unnormalized_tokens[index])
-        end
-      end
-
-      return words
+      matches = Regexp.new("(#{block_word})").match(line).captures
+      puts matches
+      return matches
     end 
 
     # # # # # # # # # # # # # # # # #
@@ -186,13 +190,11 @@ class GHAapp < Sinatra::Application
             REPLACEMENT_WORDS.keys.each do |word|
               if contains_block_word(line, word)
                 body = "revisit this line to fix culturally insensitive language #{line_number}"
-
-                fixed_line = line
-                block_words = get_all_block_words(line)
-                block_words.each do |block_word|
-                  replacement = match_casing(block_word)
-                  fixed_line = fixed_line.gsub(block_word, replacement)
-                end
+                
+                block_words = get_all_occurences_of_block_word(line, word)
+                fixed_line = replace_block_words(line, block_words)
+                
+                puts line, fixed_line
 
                 comments_array += [{
                   :path => file_name,
