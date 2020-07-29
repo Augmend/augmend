@@ -15,24 +15,10 @@ set :port, 3000
 set :bind, '0.0.0.0'
 
 
-# This is template code to create a GitHub App server.
-# You can read more about GitHub Apps here: # https://developer.github.com/apps/
-#
-# On its own, this app does absolutely nothing, except that it can be installed.
-# It's up to you to add functionality!
-# You can check out one example in advanced_server.rb.
-#
-# This code is a Sinatra app, for two reasons:
-#   1. Because the app will require a landing page for installation.
-#   2. To easily handle webhook events.
-#
-# Of course, not all apps need to receive and process events!
-# Feel free to rip out the event handling code if you don't need it.
-#
-# Have fun!
-#
+# This App was built off of the GitHub App quickstart guide:
+# https://developer.github.com/apps/quickstart-guides/setting-up-your-development-environment/
 
-class GHApp < Sinatra::Application
+class Augmend < Sinatra::Application
 
   # Expects that the private key in PEM format. Converts the newlines
   PRIVATE_KEY = OpenSSL::PKey::RSA.new(ENV['GITHUB_PRIVATE_KEY'].gsub('\n', "\n"))
