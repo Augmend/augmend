@@ -42,6 +42,18 @@ module Helper
     return []
   end
 
+  def get_variable_names_with_block_words(line)
+    tokenized = line.split(/\b/)
+    terms_with_block_words = []
+    tokenized.each do |token|
+      REGEX.values.each do |regex_key|
+        match = Regexp.new(regex_key, "i").match(token)
+        terms_with_block_words.push(token) unless match.nil?
+      end
+    end
+    return terms_with_block_words
+  end
+
   def match_casing(original_word)
     # all lowercase, no special chars
     if !original_word.include?("-") && !original_word.include?("_") && is_downcase?(original_word)

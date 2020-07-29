@@ -7,18 +7,6 @@ class PRScan
     @installation_client = installation_client
   end
 
-  def get_variable_names_with_block_words(line)
-    tokenized = line.split(/\b/)
-    terms_with_block_words = []
-    tokenized.each do |token|
-      REGEX.values.each do |regex_key|
-        match = Regexp.new(regex_key, "i").match(token)
-        terms_with_block_words.push(token) unless match.nil?
-      end
-    end
-    return terms_with_block_words
-  end
-
   def handle_new_pull_request(payload)
     repo = payload['repository']['full_name']
     pr_number = payload['pull_request']['number']

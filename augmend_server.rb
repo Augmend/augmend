@@ -10,6 +10,7 @@ require 'open-uri'
 
 require_relative "repo_scan"
 require_relative "pr_scan"
+require_relative "pr_commit"
 
 set :port, 3000
 set :bind, '0.0.0.0'
@@ -54,6 +55,9 @@ class Augmend < Sinatra::Application
         prScanner = PRScan.new(@installation_client)
         prScanner.handle_new_pull_request(@payload)
       end
+    when 'pull_request_review_comment'
+      prCommitter = PRCommit.new(@installation_client)
+      prCommitter.handle_new_reply(@payload)
     when 'installation'
       if @payload['action'] === 'created'
         @payload['repositories'].each do |repository|
