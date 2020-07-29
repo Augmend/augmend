@@ -48,6 +48,13 @@ class GHAapp < Sinatra::Application
     'slave' =>'secondary'
   }
 
+  REGEX = {
+    'whitelist' => "(white[-|_]*list)",
+    'blacklist' => "(black[-|_]*list)",
+    'master' => "(master)",
+    'slave' => "(secondary)",
+  }
+
   # Turn on Sinatra's verbose logging during development
   configure :development do
     set :logging, Logger::DEBUG
@@ -73,11 +80,6 @@ class GHAapp < Sinatra::Application
       end
     end
 
-    # 
-    # # # # # # # # # # # #
-    # ADD YOUR CODE HERE  #
-    # # # # # # # # # # # #
-
     200 # success status
   end
 
@@ -96,7 +98,8 @@ class GHAapp < Sinatra::Application
         return replacement.downcase
       # all uppercase, no special chars
       elsif !original_word.include?("-") && !original_word.include?("_") && is_uppercase?(original_word)
-        replacement = REPLACEMENT_WORDS[original_word]
+        normalized = original_word.downcase
+        replacement = REPLACEMENT_WORDS[normalized]
         replacement = replacement.gsub(/_/, "")
         return replacement.upcase
       # snake case
@@ -130,18 +133,6 @@ class GHAapp < Sinatra::Application
       end
     end
 
-    def replace_block_words(block_words, line)
-      puts block_words, line
-
-      fixed_line = line
-      block_words.each do |word|
-        replacement = match_casing(word)
-        fixed_line = fixed_line.gsub(line, replacements)
-      end
-      return fixed_line
-    end
-
-
     def is_hyphenated?(word)
       word.include?("-")
     end
@@ -158,17 +149,13 @@ class GHAapp < Sinatra::Application
       word == word.upcase
     end
 
-  
-    def get_all_occurences_of_block_word(line, block_word)
-      line = line.gsub(/_|-/, "").downcase
-      matches = Regexp.new("(#{block_word})").match(line).captures
-      puts matches
-      return matches
-    end 
+    def get_all_block_words(line, word)
+      matches = Regexp.new(REGEX[word], "i").match(line)
 
-    # # # # # # # # # # # # # # # # #
-    # ADD YOUR HELPER METHODS HERE  #
-    # # # # # # # # # # # # # # # # #
+      return matches.captures unless matches.nil?
+      return []
+    end
+
     def handle_new_pull_request(payload)
       logger.debug 'A PR was opened!'
 
@@ -187,15 +174,21 @@ class GHAapp < Sinatra::Application
           line_number = 0
           f.each_line do |line|
             line_number += 1
+            # for each block word
             REPLACEMENT_WORDS.keys.each do |word|
+              # if it contains the block word (normalized)
               if contains_block_word(line, word)
                 body = "revisit this line to fix culturally insensitive language #{line_number}"
-                
-                block_words = get_all_occurences_of_block_word(line, word)
-                fixed_line = replace_block_words(line, block_words)
-                
-                puts line, fixed_line
 
+                fixed_line = line
+                # array of words to replace
+                block_words = get_all_block_words(line, word)
+                block_words.each do |block_word|
+                  replacement = match_casing(block_word)
+                  fixed_line = fixed_line.gsub(block_word, replacement)
+                end
+
+                # TODO: update body text
                 comments_array += [{
                   :path => file_name,
                   :line => line_number,
