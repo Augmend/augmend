@@ -8,6 +8,8 @@ require 'time'        # Gets ISO 8601 representation of a Time object
 require 'logger'      # Logs debug statements
 require 'open-uri'
 
+require_relative "repo_scan"
+
 set :port, 3000
 set :bind, '0.0.0.0'
 
@@ -77,6 +79,13 @@ class GHAapp < Sinatra::Application
     when 'pull_request'
       if !(["locked", "closed"].include? @payload['action'])
         handle_new_pull_request(@payload)
+      end
+    when 'installation'
+      if @payload['action'] === 'created'
+        @payload['repositories'].each do |repository|
+          scanObj = CodeScan.new(@installation_client, repository['full_name'])
+          scanObj.start
+        end
       end
     end
 
