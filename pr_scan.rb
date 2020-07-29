@@ -18,7 +18,6 @@ class PRScan
     to_update = {}
     changed_files = @installation_client.pull_request_files(repo, pr_number)
     changed_files.each do |item|
-      puts item
       file_raw_url = item.raw_url
       file_name = item.filename # path
       comments_array = []
