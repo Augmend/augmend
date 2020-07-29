@@ -14,18 +14,52 @@ module Helper
     'slave' => "(secondary)",
   }
 
-  def replace_block_words(original_line)
+  # Scan a file to replace blocked words
+  # Update the repo/branch with the altered file
+  def process_file(installation_client, repository, branch, block_word)
+    file_changed = false
+    URI.open(content.download_url) {|f|
+      lines_to_be_written = []
+      f.each_line do |original_line|
+        changed_line = replace_block_words(original_line, block_word)
+        file_changed = true unless changed_line == original_line
+        lines_to_be_written.push(changed_line)
+      end
+
+      if file_changed
+        installation_client.update_contents(
+          repository,
+          content.path,
+          "Augmend bot updated file content",
+          content.sha,
+          lines_to_be_written.join(),
+          :branch => branch)
+        return true
+      end
+      return false
+    }
+  end
+
+  def replace_block_words(original_line, block_word)
     fixed_line = original_line
-    # get all blocked words
-    REPLACEMENT_WORDS.keys.each do |word|
-      # if it contains the normalized block word
-      if contains_block_word(original_line, word)
-        # find array of words to replace
-        block_words = get_all_block_words(original_line, word)
-        block_words.each do |block_word|
-          replacement = match_casing(block_word)
-          fixed_line = fixed_line.gsub(block_word, replacement)
-        end
+    if block_word # only replace occurrences of a single block word
+      fixed_line = process_line(original_line, fixed_line, block_word)
+    else # replace occurrence of all block words
+      REPLACEMENT_WORDS.keys.each do |word|
+        fixed_line = process_line(original_line, fixed_line, word)
+      end
+    end
+    fixed_line
+  end
+
+  def process_line(original_line, fixed_line, word)
+    # if line contains the normalized block word
+    if contains_block_word(original_line, word)
+      # find array of words to replace
+      block_words = get_all_block_words(original_line, word)
+      block_words.each do |block_word|
+        replacement = match_casing(block_word)
+        fixed_line = fixed_line.gsub(block_word, replacement)
       end
     end
     fixed_line
