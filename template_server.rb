@@ -9,6 +9,7 @@ require 'logger'      # Logs debug statements
 require 'open-uri'
 
 require_relative "repo_scan"
+require_relative "pr_scan"
 
 set :port, 3000
 set :bind, '0.0.0.0'
@@ -31,7 +32,7 @@ set :bind, '0.0.0.0'
 # Have fun!
 #
 
-class GHAapp < Sinatra::Application
+class GHApp < Sinatra::Application
 
   # Expects that the private key in PEM format. Converts the newlines
   PRIVATE_KEY = OpenSSL::PKey::RSA.new(ENV['GITHUB_PRIVATE_KEY'].gsub('\n', "\n"))
@@ -42,20 +43,6 @@ class GHAapp < Sinatra::Application
 
   # The GitHub App's identifier (type integer) set when registering an app.
   APP_IDENTIFIER = ENV['GITHUB_APP_IDENTIFIER']
-
-  REPLACEMENT_WORDS = {
-    'whitelist' => 'enable_list',
-    'blacklist' => 'block_list',
-    'master' => 'main',
-    'slave' =>'secondary'
-  }
-
-  REGEX = {
-    'whitelist' => "(white[-|_]*list)",
-    'blacklist' => "(black[-|_]*list)",
-    'master' => "(master)",
-    'slave' => "(secondary)",
-  }
 
   # Turn on Sinatra's verbose logging during development
   configure :development do
@@ -77,8 +64,9 @@ class GHAapp < Sinatra::Application
     # listen for open pull requests
     case request.env['HTTP_X_GITHUB_EVENT']
     when 'pull_request'
-      if !(["locked", "closed"].include? @payload['action'])
-        handle_new_pull_request(@payload)
+      if !(["locked", "closed"].include? @payload['action']) && @payload['pull_request']['user']['login'] != "augmend[bot]"
+        prScanner = PRScan.new(@installation_client)
+        prScanner.handle_new_pull_request(@payload)
       end
     when 'installation'
       if @payload['action'] === 'created'
@@ -92,141 +80,7 @@ class GHAapp < Sinatra::Application
     200 # success status
   end
 
-
   helpers do
-    def contains_block_word(line, word)
-      line = line.gsub(/_|-/, "")
-      return line.downcase.include?(word)
-    end
-
-    def match_casing(original_word)
-      # all lowercase, no special chars
-      if !original_word.include?("-") && !original_word.include?("_") && is_downcase?(original_word)
-        replacement = REPLACEMENT_WORDS[original_word]
-        replacement = replacement.gsub(/_/, "")
-        return replacement.downcase
-      # all uppercase, no special chars
-      elsif !original_word.include?("-") && !original_word.include?("_") && is_uppercase?(original_word)
-        normalized = original_word.downcase
-        replacement = REPLACEMENT_WORDS[normalized]
-        replacement = replacement.gsub(/_/, "")
-        return replacement.upcase
-      # snake case
-      elsif is_snakecase?(original_word)
-        normalized = original_word.gsub(/_/, "")
-        if is_downcase?(normalized)
-          return REPLACEMENT_WORDS[normalized].downcase
-        elsif is_uppercase?(normalized)
-          return REPLACEMENT_WORDS[normalized].upcase
-        end
-      # hyphenated words
-      elsif is_hyphenated?(original_word)
-        normalized = original_word.gsub(/-/, "")
-        if is_downcase?(normalized)
-          replacement = REPLACEMENT_WORDS[normalized].downcase
-        elsif is_uppercase?(normalized)
-          replacement = REPLACEMENT_WORDS[normalized].upcase
-        end
-        return replacement.dasherize()
-      # camel case
-      else
-        normalized = original_word.downcase
-        replacement = REPLACEMENT_WORDS[normalized]
-        if is_downcase?(original_word[0])
-          replacement = replacement.split('_').collect(&:capitalize).join
-          replacement[0] = replacement[0].downcase
-          return replacement
-        else
-          return replacement.split('_').collect(&:capitalize).join
-        end
-      end
-    end
-
-    def is_hyphenated?(word)
-      word.include?("-")
-    end
-
-    def is_snakecase?(word)
-      word.include?("_")
-    end
-
-    def is_downcase?(word)
-      word == word.downcase
-    end
-
-    def is_uppercase?(word)
-      word == word.upcase
-    end
-
-    # def process_line_for_insensitivity(original_line)
-    #   if the original_line has insensitive words, replace & send the new line
-    #   else return the original_line
-    #   end
-    # end
-
-    def replace_block_words(original_line, word)
-      fixed_line = original_line
-      # array of words to replace
-      block_words = get_all_block_words(original_line, word)
-      block_words.each do |block_word|
-        replacement = match_casing(block_word)
-        fixed_line = fixed_line.gsub(block_word, replacement)
-      end
-      fixed_line.strip
-    end
-
-    def get_all_block_words(line, word)
-      matches = Regexp.new(REGEX[word], "i").match(line)
-
-      return matches.captures unless matches.nil?
-      return []
-    end
-
-    def handle_new_pull_request(payload)
-      logger.debug 'A PR was opened!'
-
-      repo = payload['repository']['full_name']
-      pr_number = payload['pull_request']['number']
-      sha = payload['pull_request']['head']['sha']
-
-      to_update = {}
-      changed_files = @installation_client.pull_request_files(repo, pr_number)
-      changed_files.each do |item|
-        file_raw_url = item.raw_url
-        file_name = item.filename # path
-        comments_array = []
-
-        URI.open(file_raw_url) {|f|
-          line_number = 0
-          f.each_line do |line|
-            line_number += 1
-            # for each block word
-            REPLACEMENT_WORDS.keys.each do |word|
-              # if it contains the block word (normalized)
-              if contains_block_word(line, word)
-                body = "revisit this line to fix culturally insensitive language #{line_number}"
-                fixed_line = replace_block_words(line, word)
-                # TODO: update body text
-                comments_array += [{
-                  :path => file_name,
-                  :line => line_number,
-                  :body => "test this text\n```suggestion\n#{fixed_line}\n```",
-                }]
-              end
-            end
-          end
-
-          options = {
-            :body => "overall body",
-            :commit_id => sha,
-            :event => "REQUEST_CHANGES",
-            :comments => comments_array
-          }
-
-          @installation_client.post("/repos/#{repo}/pulls/#{pr_number}/reviews", options)
-        }
-      end
-    end
 
     # Saves the raw payload and converts the payload to JSON format
     def get_payload_request(request)
@@ -249,14 +103,14 @@ class GHAapp < Sinatra::Application
     # a malicious third party.
     def authenticate_app
       payload = {
-          # The time that this JWT was issued, _i.e._ now.
-          iat: Time.now.to_i,
+        # The time that this JWT was issued, _i.e._ now.
+        iat: Time.now.to_i,
 
-          # JWT expiration time (10 minute maximum)
-          exp: Time.now.to_i + (10 * 60),
+        # JWT expiration time (10 minute maximum)
+        exp: Time.now.to_i + (10 * 60),
 
-          # Your GitHub App's identifier number
-          iss: APP_IDENTIFIER
+        # Your GitHub App's identifier number
+        iss: APP_IDENTIFIER
       }
 
       # Cryptographically sign the JWT.
