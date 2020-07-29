@@ -15,6 +15,7 @@ class PRScan
     to_update = {}
     changed_files = @installation_client.pull_request_files(repo, pr_number)
     changed_files.each do |item|
+      puts item
       file_raw_url = item.raw_url
       file_name = item.filename # path
       comments_array = []
@@ -26,7 +27,7 @@ class PRScan
         f.each_line do |line|
           line_number += 1
 
-          fixed_line = replace_block_words(line)
+          fixed_line = replace_block_words(line, nil)
           next if fixed_line == line
 
           variable_names = get_variable_names_with_block_words(line)

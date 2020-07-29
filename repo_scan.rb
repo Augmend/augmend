@@ -44,7 +44,7 @@ class CodeScan
     contents.each do |content|
       if content.type === 'file'
         puts "Processing file #{content.name}"
-        process_file(content)
+        @repo_updated = process_file(@installation_client, @repository, @new_branch, content, nil)
       elsif content.type === 'dir'
         puts "Processing directory #{content.name}"
         process(content)
@@ -73,30 +73,5 @@ class CodeScan
       @new_branch,
       "[Augmend Bot] Suggested File Replacements",
       "Augmend bot replaced racially insensitive words in the repository")
-  end
-
-  # Scan a file to replace inappropriate words
-  # Update the repo with the altered file
-  def process_file(content)
-    file_changed = false
-    URI.open(content.download_url) {|f|
-      lines_to_be_written = []
-      f.each_line do |original_line|
-        changed_line = replace_block_words(original_line)
-        file_changed = true unless changed_line == original_line
-        lines_to_be_written.push(changed_line)
-      end
-
-      if file_changed
-        @repo_updated = true
-        @installation_client.update_contents(
-          @repository,
-          content.path,
-          "Augmend bot updated file content",
-          content.sha,
-          lines_to_be_written.join(),
-          :branch => @new_branch)
-      end
-    }
   end
 end
