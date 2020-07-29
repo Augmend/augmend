@@ -149,6 +149,23 @@ class GHAapp < Sinatra::Application
       word == word.upcase
     end
 
+    # def process_line_for_insensitivity(original_line)
+    #   if the original_line has insensitive words, replace & send the new line
+    #   else return the original_line
+    #   end
+    # end
+
+    def replace_block_words(original_line, word)
+      fixed_line = original_line
+      # array of words to replace
+      block_words = get_all_block_words(original_line, word)
+      block_words.each do |block_word|
+        replacement = match_casing(block_word)
+        fixed_line = fixed_line.gsub(block_word, replacement)
+      end
+      fixed_line.strip
+    end
+
     def get_all_block_words(line, word)
       matches = Regexp.new(REGEX[word], "i").match(line)
 
@@ -179,20 +196,12 @@ class GHAapp < Sinatra::Application
               # if it contains the block word (normalized)
               if contains_block_word(line, word)
                 body = "revisit this line to fix culturally insensitive language #{line_number}"
-
-                fixed_line = line
-                # array of words to replace
-                block_words = get_all_block_words(line, word)
-                block_words.each do |block_word|
-                  replacement = match_casing(block_word)
-                  fixed_line = fixed_line.gsub(block_word, replacement)
-                end
-
+                fixed_line = replace_block_words(line, word)
                 # TODO: update body text
                 comments_array += [{
                   :path => file_name,
                   :line => line_number,
-                  :body => "test this text\n```suggestion\n#{fixed_line}```",
+                  :body => "test this text\n```suggestion\n#{fixed_line}\n```",
                 }]
               end
             end
