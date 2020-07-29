@@ -8,10 +8,10 @@ class PRScan
   end
 
   def get_variable_names_with_block_words(line)
-    tokenized = line.split(" ")
+    tokenized = line.split(/\b/)
     terms_with_block_words = []
     tokenized.each do |token|
-      REGEX.keys.each do |regex_key| 
+      REGEX.values.each do |regex_key|
         match = Regexp.new(regex_key, "i").match(token)
         terms_with_block_words.push(token) unless match.nil?
       end
@@ -50,34 +50,31 @@ class PRScan
 
             occurences.push({
               :line_number => line_number,
-              :line_contents => fixed_line
+              :fixed_line => fixed_line
             })
             variable_occurences_map[var_name] = occurences
           end
         end
       }
 
-      puts "variable map: #{variable_occurences_map}"
-
       # depending on the number of occurences of the variable, add a regular or an interactive comment to the PR
       variable_occurences_map.keys.each do |var_name|
-        puts occurences
         occurences = variable_occurences_map[var_name]
         if occurences.length() > 2
           first_occurence = occurences[0]
           body_text = "Augmend bot discovered multiple usages of this term. Reply `Yes` to this comment if you'd like us to make the changes everywhere else."
           comments_array += [{
             :path => file_name,
-            :line => first_occurence.line_number,
-            :body => "#{body_text}\n```suggestion\n#{first_occurence.fixed_line.strip}\n```",
+            :line => first_occurence[:line_number],
+            :body => "#{body_text}\n```suggestion\n#{first_occurence[:fixed_line].strip}\n```",
           }]
         else
            body_text = "Augmend bot recommends the following changes:"
            occurences.each do |occurence|
             comments_array += [{
               :path => file_name,
-              :line => occurence.line_number,
-              :body => "#{body_text}\n```suggestion\n#{occurence.fixed_line.strip}\n```",
+              :line => occurence[:line_number],
+              :body => "#{body_text}\n```suggestion\n#{occurence[:fixed_line].strip}\n```",
             }]
            end
         end
