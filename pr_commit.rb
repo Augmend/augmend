@@ -22,6 +22,6 @@ class PRCommit
     variable_name = get_variable_names_with_block_words(parent_comment.diff_hunk).first
     puts "File: #{file_content_payload.html_url}"
     puts "Var: #{variable_name}"
-    # process_file(@installation_client, repo, branch, file_content_payload, variable_name)
+    process_file(@installation_client, repo, branch, file_content_payload, variable_name)
   end
 end

@@ -51,10 +51,8 @@ class Augmend < Sinatra::Application
     # listen for open pull requests
     case request.env['HTTP_X_GITHUB_EVENT']
     when 'pull_request'
-      if !(["locked", "closed"].include? @payload['action']) && @payload['pull_request']['user']['login'] != "augmend[bot]"
-        prScanner = PRScan.new(@installation_client)
-        prScanner.handle_new_pull_request(@payload)
-      end
+      prScanner = PRScan.new(@installation_client)
+      prScanner.handle_new_pull_request(@payload)
     when 'pull_request_review_comment'
       prCommitter = PRCommit.new(@installation_client)
       prCommitter.handle_new_reply(@payload)

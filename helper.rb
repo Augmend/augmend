@@ -16,17 +16,21 @@ module Helper
 
   # Scan a file to replace blocked words
   # Update the repo/branch with the altered file
-  def process_file(installation_client, repository, branch, block_word)
+  def process_file(installation_client, repository, branch, content, block_word)
     file_changed = false
     URI.open(content.download_url) {|f|
       lines_to_be_written = []
       f.each_line do |original_line|
+        puts "Line: #{original_line}"
         changed_line = replace_block_words(original_line, block_word)
+        puts "Changed line: #{changed_line}"
         file_changed = true unless changed_line == original_line
+        puts "Flag: #{file_changed}"
         lines_to_be_written.push(changed_line)
       end
 
       if file_changed
+        puts "file changed!"
         installation_client.update_contents(
           repository,
           content.path,
@@ -42,27 +46,41 @@ module Helper
 
   def replace_block_words(original_line, block_word)
     fixed_line = original_line
+    puts "check #{block_word}"
     if block_word # only replace occurrences of a single block word
-      fixed_line = process_line(original_line, fixed_line, block_word)
+      puts "here?"
+      # we're using variable name here, not the block word itself
+      # fixed_line = process_line(original_line, fixed_line, variable_name)
+
+      if original_line.include? block_word
+        # white_list
+        # MASTER
+        word = find_block_word(block_word)
+        replacement = match_casing(word)
+        puts "Replacing #{block_word} with #{replacement}"
+        fixed_line = fixed_line.gsub(word, replacement)
+      end
     else # replace occurrence of all block words
       REPLACEMENT_WORDS.keys.each do |word|
-        fixed_line = process_line(original_line, fixed_line, word)
+        if contains_block_word(original_line, word)
+          # find array of words to replace
+          block_words = get_all_block_words(original_line, word)
+          block_words.each do |block_word|
+            replacement = match_casing(block_word)
+            puts "Replacing #{block_word} with #{replacement}"
+            fixed_line = fixed_line.gsub(block_word, replacement)
+          end
+        end
       end
     end
     fixed_line
   end
 
-  def process_line(original_line, fixed_line, word)
-    # if line contains the normalized block word
-    if contains_block_word(original_line, word)
-      # find array of words to replace
-      block_words = get_all_block_words(original_line, word)
-      block_words.each do |block_word|
-        replacement = match_casing(block_word)
-        fixed_line = fixed_line.gsub(block_word, replacement)
-      end
+  def find_block_word(variable_name)
+    REGEX.values.each do |regex|
+      match = Regexp.new(regex, "i").match(variable_name)
+      return match.captures.first unless match.nil?
     end
-    fixed_line
   end
 
   def contains_block_word(line, word)
