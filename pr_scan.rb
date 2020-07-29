@@ -8,8 +8,8 @@ class PRScan
   end
 
   def handle_new_pull_request(payload)
-    return if ["locked", "closed"].include? @payload['action']
-    return if @payload['sender']['login'] == "augmend[bot]"
+    return if ['locked', 'closed'].include? payload['action']
+    return if payload['sender']['login'] == "augmend[bot]"
 
     repo = payload['repository']['full_name']
     pr_number = payload['pull_request']['number']
