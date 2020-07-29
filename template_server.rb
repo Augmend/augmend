@@ -42,10 +42,17 @@ class GHAapp < Sinatra::Application
   APP_IDENTIFIER = ENV['GITHUB_APP_IDENTIFIER']
 
   REPLACEMENT_WORDS = {
-    'whitelist' => 'enablelist',
-    'blacklist' => 'blocklist',
+    'whitelist' => 'enable_list',
+    'blacklist' => 'block_list',
     'master' => 'main',
     'slave' =>'secondary'
+  }
+
+  REGEX = {
+    'whitelist' => "(white[-|_]*list)",
+    'blacklist' => "(black[-|_]*list)",
+    'master' => "(master)",
+    'slave' => "(secondary)",
   }
 
   # Turn on Sinatra's verbose logging during development
@@ -73,20 +80,99 @@ class GHAapp < Sinatra::Application
       end
     end
 
-    # 
-    # # # # # # # # # # # #
-    # ADD YOUR CODE HERE  #
-    # # # # # # # # # # # #
-
     200 # success status
   end
 
 
   helpers do
+    def contains_block_word(line, word)
+      line = line.gsub(/_|-/, "")
+      return line.downcase.include?(word)
+    end
 
-    # # # # # # # # # # # # # # # # #
-    # ADD YOUR HELPER METHODS HERE  #
-    # # # # # # # # # # # # # # # # #
+    def match_casing(original_word)
+      # all lowercase, no special chars
+      if !original_word.include?("-") && !original_word.include?("_") && is_downcase?(original_word)
+        replacement = REPLACEMENT_WORDS[original_word]
+        replacement = replacement.gsub(/_/, "")
+        return replacement.downcase
+      # all uppercase, no special chars
+      elsif !original_word.include?("-") && !original_word.include?("_") && is_uppercase?(original_word)
+        normalized = original_word.downcase
+        replacement = REPLACEMENT_WORDS[normalized]
+        replacement = replacement.gsub(/_/, "")
+        return replacement.upcase
+      # snake case
+      elsif is_snakecase?(original_word)
+        normalized = original_word.gsub(/_/, "")
+        if is_downcase?(normalized)
+          return REPLACEMENT_WORDS[normalized].downcase
+        elsif is_uppercase?(normalized)
+          return REPLACEMENT_WORDS[normalized].upcase
+        end
+      # hyphenated words
+      elsif is_hyphenated?(original_word)
+        normalized = original_word.gsub(/-/, "")
+        if is_downcase?(normalized)
+          replacement = REPLACEMENT_WORDS[normalized].downcase
+        elsif is_uppercase?(normalized)
+          replacement = REPLACEMENT_WORDS[normalized].upcase
+        end
+        return replacement.dasherize()
+      # camel case
+      else
+        normalized = original_word.downcase
+        replacement = REPLACEMENT_WORDS[normalized]
+        if is_downcase?(original_word[0])
+          replacement = replacement.split('_').collect(&:capitalize).join
+          replacement[0] = replacement[0].downcase
+          return replacement
+        else
+          return replacement.split('_').collect(&:capitalize).join
+        end
+      end
+    end
+
+    def is_hyphenated?(word)
+      word.include?("-")
+    end
+
+    def is_snakecase?(word)
+      word.include?("_")
+    end
+
+    def is_downcase?(word)
+      word == word.downcase
+    end
+
+    def is_uppercase?(word)
+      word == word.upcase
+    end
+
+    # def process_line_for_insensitivity(original_line)
+    #   if the original_line has insensitive words, replace & send the new line
+    #   else return the original_line
+    #   end
+    # end
+
+    def replace_block_words(original_line, word)
+      fixed_line = original_line
+      # array of words to replace
+      block_words = get_all_block_words(original_line, word)
+      block_words.each do |block_word|
+        replacement = match_casing(block_word)
+        fixed_line = fixed_line.gsub(block_word, replacement)
+      end
+      fixed_line.strip
+    end
+
+    def get_all_block_words(line, word)
+      matches = Regexp.new(REGEX[word], "i").match(line)
+
+      return matches.captures unless matches.nil?
+      return []
+    end
+
     def handle_new_pull_request(payload)
       logger.debug 'A PR was opened!'
 
@@ -101,35 +187,21 @@ class GHAapp < Sinatra::Application
         file_name = item.filename # path
         comments_array = []
 
-        # puts item.to_yaml_properties()
-
         URI.open(file_raw_url) {|f|
           line_number = 0
           f.each_line do |line|
             line_number += 1
+            # for each block word
             REPLACEMENT_WORDS.keys.each do |word|
-              if line.downcase.include?(word)
-                # contents[line_number + 1] = line
+              # if it contains the block word (normalized)
+              if contains_block_word(line, word)
                 body = "revisit this line to fix culturally insensitive language #{line_number}"
-
-                # @installation_client.add_comment("Augmend/test-repo", 3, "testing this")
-
-                # @installation_client.create_pull_request_comment(
-                #   repo,
-                #   pr_number,
-                #   body,
-                #   sha,
-                #   file_name,
-                #   line_number,
-                # )
-
-                fixed_line = line.gsub(word, REPLACEMENT_WORDS[word])
-                puts fixed_line
-
+                fixed_line = replace_block_words(line, word)
+                # TODO: update body text
                 comments_array += [{
                   :path => file_name,
                   :line => line_number,
-                  :body => "test this text\n```suggestion\n#{fixed_line}```",
+                  :body => "test this text\n```suggestion\n#{fixed_line}\n```",
                 }]
               end
             end
