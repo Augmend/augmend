@@ -60,7 +60,6 @@ module Helper
         if contains_block_word(original_line, word)
           # find array of words to replace
           block_words = get_all_block_words(original_line, word)
-          puts "block_words: #{block_words}"
           block_words.each do |block_word|
             replacement = match_casing(block_word)
             fixed_line = fixed_line.gsub(block_word, replacement)
