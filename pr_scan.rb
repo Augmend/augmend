@@ -27,7 +27,7 @@ class PRScan
       URI.open(file_raw_url) {|f|
         line_number = 0
         f.each_line do |line|
-          next if line.valid_encoding?
+          #next if line.valid_encoding?
           line_number += 1
 
           fixed_line = replace_block_words(line, nil)
@@ -78,6 +78,7 @@ class PRScan
         :event => "REQUEST_CHANGES",
         :comments => comments_array
       }
+
       @installation_client.post("/repos/#{repo}/pulls/#{pr_number}/reviews", options)
     end
   end
