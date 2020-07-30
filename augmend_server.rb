@@ -57,8 +57,15 @@ class Augmend < Sinatra::Application
       prCommitter = PRCommit.new(@installation_client)
       prCommitter.handle_new_reply(@payload)
     when 'installation'
-      if @payload['action'] === 'created'
+      if ['created'].include? @payload['action']
         @payload['repositories'].each do |repository|
+          scanObj = CodeScan.new(@installation_client, repository['full_name'])
+          scanObj.start
+        end
+      end
+    when 'installation_repositories'
+      if ['added'].include? @payload['action']
+        @payload['repositories_added'].each do |repository|
           scanObj = CodeScan.new(@installation_client, repository['full_name'])
           scanObj.start
         end

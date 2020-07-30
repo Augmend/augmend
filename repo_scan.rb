@@ -15,8 +15,8 @@ class CodeScan
   def initialize(installation_client, repository)
     @installation_client = installation_client
     @repository = repository
-    @base_branch = 'main'
-    @new_branch = 'augmend-bot-scan'
+    @base_branch = find_default_branch(repository)
+    @new_branch = "augmend-bot-scan#{Time.now.strftime("%Y-%m-%d-%H-%M-%S")}"
     @repo_updated = false
   end
 
@@ -35,24 +35,29 @@ class CodeScan
   end
 
   def process(content)
-    contents = nil
-    if content == nil
-      contents = @installation_client.contents(@repository)
-    else
-      contents = @installation_client.contents(@repository, :path => content.path)
-    end
+    contents = if content.nil?
+                 puts "Processing repository..."
+                 contents = @installation_client.contents(@repository)
+               else
+                 contents = @installation_client.contents(@repository, :path => content.path)
+               end
     contents.each do |content|
       if content.type === 'file'
-        puts "Processing file #{content.name}"
-        @repo_updated = process_file(@installation_client, @repository, @new_branch, content, nil)
+        result = process_file(@installation_client, @repository, @new_branch, content, nil)
+        @repo_updated ||= result
       elsif content.type === 'dir'
-        puts "Processing directory #{content.name}"
         process(content)
       end
     end
   end
 
+  def find_default_branch(repository_name)
+    repo = @installation_client.repository(repository_name)
+    repo.default_branch
+  end
+
   def create_branch
+    puts @base_branch
     base_branch = @installation_client.refs(@repository, "heads/#{@base_branch}")
     sha = base_branch.object.sha
 

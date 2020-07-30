@@ -21,20 +21,26 @@ module Helper
     URI.open(content.download_url) {|f|
       lines_to_be_written = []
       f.each_line do |original_line|
+        next unless original_line.valid_encoding?
+
         changed_line = replace_block_words(original_line, block_word)
         file_changed = true unless changed_line == original_line
         lines_to_be_written.push(changed_line)
       end
 
       if file_changed
-        installation_client.update_contents(
-          repository,
-          content.path,
-          "Augmend bot updated file content",
-          content.sha,
-          lines_to_be_written.join(),
-          :branch => branch)
-        return true
+        begin
+          installation_client.update_contents(
+            repository,
+            content.path,
+            "Augmend bot updated file content",
+            content.sha,
+            lines_to_be_written.join(),
+            :branch => branch)
+          return true
+        rescue => e
+          # this is likely github workflow files
+        end
       end
       return false
     }
@@ -44,11 +50,7 @@ module Helper
     fixed_line = original_line
     if block_word # only replace occurrences of a single block word
       # we're using variable name here, not the block word itself
-      # fixed_line = process_line(original_line, fixed_line, variable_name)
-
       if original_line.include? block_word
-        # white_list
-        # MASTER
         word = find_block_word(block_word)
         replacement = match_casing(word)
         fixed_line = fixed_line.gsub(word, replacement)
