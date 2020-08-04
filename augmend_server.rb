@@ -7,19 +7,25 @@ require 'jwt'         # Authenticates a GitHub App
 require 'time'        # Gets ISO 8601 representation of a Time object
 require 'logger'      # Logs debug statements
 require 'open-uri'
+require 'webrick'
+require 'webrick/https'
+require 'rack/ssl-enforcer'
 
 require_relative "repo_scan"
 require_relative "pr_scan"
 require_relative "pr_commit"
 
-set :port, 3000
-set :bind, '0.0.0.0'
+# :port, 3000
+#set :bind, '0.0.0.0'
 
+#set :ssl_certificate, "cert.crt"
+#set :force_ssl, true
 
 # This App was built off of the GitHub App quickstart guide:
 # https://developer.github.com/apps/quickstart-guides/setting-up-your-development-environment/
 
 class Augmend < Sinatra::Application
+  use Rack::SslEnforcer
 
   # Expects that the private key in PEM format. Converts the newlines
   PRIVATE_KEY = OpenSSL::PKey::RSA.new(ENV['GITHUB_PRIVATE_KEY'].gsub('\n', "\n"))
@@ -35,7 +41,6 @@ class Augmend < Sinatra::Application
   configure :development do
     set :logging, Logger::DEBUG
   end
-
 
   # Before each request to the `/event_handler` route
   before '/event_handler' do
@@ -154,5 +159,20 @@ class Augmend < Sinatra::Application
   # __FILE__ is the current file
   # If they are the same—that is, we are running this file directly, call the
   # Sinatra run method
-  run! if __FILE__ == $0
+  #run! if  __FILE__ == $0
 end
+
+webrick_options = {
+          :BindAddress        => '0.0.0.0',
+          :Port               => 3000,
+          :Logger             => WEBrick::Log::new($stderr, WEBrick::Log::DEBUG),
+          :DocumentRoot       => "/ruby/htdocs",
+          :SSLEnable          => true,
+          :SSLVerifyClient    => OpenSSL::SSL::VERIFY_NONE,
+          :SSLCertificate     => OpenSSL::X509::Certificate.new(File.open("server.crt").read),
+          :SSLPrivateKey      => OpenSSL::PKey::RSA.new(File.open("server.key").read, "pass"),
+          :SSLCertName        => [ [ "CN",WEBrick::Utils::getservername ] ],
+          :app                => Augmend
+}
+
+Rack::Server.start webrick_options

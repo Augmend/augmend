@@ -10,7 +10,7 @@ RUN gem update --system
 
 WORKDIR /usr/src/app
 
-COPY Gemfile* *.rb ./
+COPY * ./
 
 RUN bundle install
 

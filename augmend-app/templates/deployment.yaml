@@ -50,6 +50,16 @@ spec:
                 secretKeyRef:
                   key:  webhookSecret
                   name: credentials
+            - name: SSL_CERT
+              valueFrom:
+                secretKeyRef:
+                  key:  sslCert
+                  name: credentials
+            - name: SSL_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key:  sslKey
+                  name: credentials
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
